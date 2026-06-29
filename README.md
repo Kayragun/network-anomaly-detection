@@ -51,7 +51,18 @@ Upload the CSV in the fine-tuning cell of `train.ipynb` and retrain.
 
 ## Results
 
-Trained on 4M rows — 99.9% accuracy, 1278/1282 Benign correct, 799,956/799,956 Malicious correct.
+Trained on 4M rows. Accuracy alone is misleading here — the dataset is 99.84% Malicious, so a model that predicts everything as Malicious would score 99.84% without ever identifying a single normal connection. The metrics that matter:
+
+| | Benign | Malicious |
+|---|---|---|
+| Precision | 100% | 99.999% |
+| Recall | 99.7% | 100% |
+| F1 | 99.8% | 100% |
+
+- **False positive rate: 0%** — no legitimate traffic was flagged as an attack
+- **False negative rate: 0.3%** — 4 out of 1282 Benign flows were missed
+
+The high Benign recall is the result of training with `class_weight='balanced'`, which prevents the model from ignoring the minority class.
 
 ## Dataset Citation
 
