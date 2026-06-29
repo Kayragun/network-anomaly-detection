@@ -1,0 +1,10 @@
+data/
+models/*.pkl
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.env
+notebooks/eda_plots/
+ProjectDescription.md
+requirements.txt
+.claude/
