@@ -4,7 +4,7 @@ Vigil watches your network traffic and flags attacks in real time. It uses a Ran
 
 Detects DoS/DDoS, port scanning, and brute-force attacks. Won't catch WPA password cracking — that happens at Layer 2, below what Vigil can see.
 
-Vigil is a personal project, built and maintained by a single developer. Feedback and issues are welcome.
+> *Vigil is a personal project, built and maintained by a single developer. Feedback and issues are welcome.*
 
 ## What you need
 
