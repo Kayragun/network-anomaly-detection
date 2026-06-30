@@ -43,6 +43,30 @@ streamlit run app.py
 
 Open http://localhost:8501.
 
+## Testing it
+
+`test_portscan.py` is a small helper that fakes a port scan against a target on your network. It connects to a dozen common ports one after another, which is exactly the kind of pattern Vigil should flag. Run it while monitoring is on to check that detection works:
+
+```bash
+python test_portscan.py 192.168.1.1
+```
+
+You should see the flows show up as Critical (purple) in the dashboard within about 15-20 seconds.
+
+## Severity levels
+
+Each flow gets one of five levels:
+
+- **Green — Safe:** normal traffic
+- **Yellow — Low:** mildly unusual
+- **Orange — Medium:** moderately unusual
+- **Red — High:** strongly anomalous
+- **Purple — Critical:** port scan, DDoS, or intrusion patterns
+
+## A note on sharing
+
+Don't share your `model.pkl`. It's trained on your network's patterns, so it carries a statistical fingerprint of your traffic — and it's useless to anyone else anyway, since their "normal" looks nothing like yours. Both `model.pkl` and your captured `data/` are kept out of git on purpose. Share the code, not the model.
+
 ## Reducing false positives
 
 If you see too many false alarms, capture more traffic — especially at different times of day — and retrain. The model improves as it sees more of your network's normal patterns.

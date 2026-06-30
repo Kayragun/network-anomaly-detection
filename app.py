@@ -12,6 +12,23 @@ from monitor import LiveMonitor, PYSHARK_AVAILABLE
 
 MODEL_PATH = Path(__file__).parent / "models" / "model.pkl"
 
+# Background color per severity level (dark theme friendly)
+SEVERITY_BG = {
+    "Safe": "#14532d",      # green
+    "Low": "#854d0e",       # yellow
+    "Medium": "#9a3412",    # orange
+    "High": "#7f1d1d",      # red
+    "Critical": "#581c87",  # purple
+}
+
+
+def style_severity(df):
+    """Color each row by its severity column for st.dataframe."""
+    def _row_color(row):
+        bg = SEVERITY_BG.get(row.get("severity", ""), "")
+        return [f"background-color: {bg}; color: white"] * len(row)
+    return df.style.apply(_row_color, axis=1)
+
 
 st.set_page_config(page_title="Vigil — Network IDS", page_icon="🛡️", layout="wide")
 
@@ -131,7 +148,17 @@ with tab3:
     with col_info:
         iface = st.text_input("Network Interface", value="Wi-Fi", key="iface", label_visibility="collapsed")
 
-    st.caption("Each flow is scored after 5s of inactivity")
+    st.caption("Each flow is scored ~15s after it goes idle")
+
+    st.markdown(
+        "**Severity:** "
+        "<span style='color:#22c55e'>● Safe</span> &nbsp;&nbsp; "
+        "<span style='color:#eab308'>● Low</span> &nbsp;&nbsp; "
+        "<span style='color:#f97316'>● Medium</span> &nbsp;&nbsp; "
+        "<span style='color:#ef4444'>● High</span> &nbsp;&nbsp; "
+        "<span style='color:#a855f7'>● Critical (scan / DDoS / intrusion)</span>",
+        unsafe_allow_html=True,
+    )
 
     # Drain queue and update log
     if st.session_state.monitor:
@@ -164,15 +191,15 @@ with tab3:
 
         if attacks:
             st.error(f"**{len(attacks)} anomaly(ies) detected!**")
-            attack_df = pd.DataFrame(attacks)[["timestamp", "src_ip", "dst_ip", "dst_port", "label", "confidence"]]
+            attack_df = pd.DataFrame(attacks)[["timestamp", "src_ip", "dst_ip", "dst_port", "severity", "label", "confidence"]]
             attack_df["confidence"] = attack_df["confidence"].map("{:.1%}".format)
-            st.dataframe(attack_df, use_container_width=True)
+            st.dataframe(style_severity(attack_df), use_container_width=True)
 
         with st.expander("All Flows"):
             if log:
-                all_df = pd.DataFrame(log)[["timestamp", "src_ip", "dst_ip", "label", "confidence"]]
+                all_df = pd.DataFrame(log)[["timestamp", "src_ip", "dst_ip", "severity", "label", "confidence"]]
                 all_df["confidence"] = all_df["confidence"].map("{:.1%}".format)
-                st.dataframe(all_df.head(50), use_container_width=True)
+                st.dataframe(style_severity(all_df.head(50)), use_container_width=True)
 
     elif st.session_state.monitor and st.session_state.monitor.is_running():
         st.info("Waiting for flows... (each flow appears after 5 seconds of inactivity)")

@@ -18,10 +18,15 @@ import numpy as np
 import pandas as pd
 
 try:
+    import cicflowmeter.flow_session as _fs
     from cicflowmeter.flow_session import FlowSession
     from cicflowmeter.writer import OutputWriter
     from scapy.all import AsyncSniffer
     CICFLOW_AVAILABLE = True
+    # Flush idle flows after 15s instead of the 240s default, and GC more often.
+    # Patched here so it works on a fresh install without editing the package.
+    _fs.EXPIRED_UPDATE = 15
+    _fs.PACKETS_PER_GC = 100
 except ImportError:
     CICFLOW_AVAILABLE = False
 
@@ -167,12 +172,28 @@ class _ClassifyingWriter(OutputWriter):
                     scanner_ip, target_ip, service_port = dst_ip, src_ip, src_port
                 is_port_scan = _port_scan_tracker.record(scanner_ip, target_ip, service_port)
 
+            # Severity levels:
+            #   Safe (green)     — normal traffic
+            #   Low (yellow)     — mild anomaly
+            #   Medium (orange)  — moderate anomaly
+            #   High (red)       — strong anomaly
+            #   Critical (purple)— port scan / extreme anomaly (scan, DDoS, intrusion)
             if is_broadcast:
-                label = "Benign"
-                confidence = 1.0
-            elif is_port_scan and label.lower() == "benign":
+                label, confidence, severity = "Benign", 1.0, "Safe"
+            elif is_port_scan:
+                label, confidence, severity = "Anomaly", 1.0, "Critical"
+            elif pred == 1:
+                label, severity = "Benign", "Safe"
+            else:
                 label = "Anomaly"
-                confidence = 1.0
+                if confidence < 0.4:
+                    severity = "Low"
+                elif confidence < 0.7:
+                    severity = "Medium"
+                elif confidence < 0.9:
+                    severity = "High"
+                else:
+                    severity = "Critical"
 
             record = {
                 "timestamp": time.strftime("%H:%M:%S"),
@@ -182,6 +203,7 @@ class _ClassifyingWriter(OutputWriter):
                 "dst_port": dst_port,
                 "protocol": protocol,
                 "label": label,
+                "severity": severity,
                 "confidence": confidence,
                 "is_attack": label.lower() != "benign",
             }
@@ -248,8 +270,18 @@ class LiveMonitor:
             )
             self._sniffer.start()
 
+            # Periodically force garbage collection so idle flows get flushed
+            # on a timer, not just when new packets happen to arrive.
+            last_gc = time.time()
             while not self._stop_event.is_set():
                 time.sleep(0.5)
+                now = time.time()
+                if now - last_gc >= 3:
+                    try:
+                        session.garbage_collect(now)
+                    except Exception:
+                        pass
+                    last_gc = now
 
             self._sniffer.stop()
             session.flush_flows()
