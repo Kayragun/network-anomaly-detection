@@ -88,6 +88,20 @@ If you see too many false alarms, capture more traffic especially at different t
 python src/capture_home.py --duration 3600 --interface Wi-Fi --output data/home_traffic.csv
 ```
 
+## Features used by the model
+
+Each flow is described by 78 numeric features — no IP addresses, no timestamps. The model sees:
+
+- **Ports & protocol** — source/destination port, protocol number
+- **Packet counts** — total forward and backward packets per flow
+- **Packet sizes** — min, max, mean, std in each direction and overall
+- **Throughput** — bytes/s and packets/s for the flow and each direction
+- **Timing (IAT)** — inter-arrival time statistics (mean, std, min, max) for the flow and each direction
+- **TCP flags** — counts of SYN, ACK, FIN, RST, PSH, URG, CWR, ECE flags
+- **Flow shape** — down/up ratio, window sizes, active/idle durations, bulk transfer stats
+
+IP addresses are dropped before training and inference, so DHCP address changes have no effect on detection.
+
 ## How it works
 
 IsolationForest learns the structure of normal traffic. It doesn't need attack examples. It builds a bunch of random decision trees and measures how quickly each flow gets isolated from the rest unusual flows get separated fast, so a short path means something looks off.
