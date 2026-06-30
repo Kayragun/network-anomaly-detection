@@ -19,6 +19,8 @@ pip install -r requirements.txt
 
 ## Setup
 
+Follow these three steps and you'll end up with a model built entirely from your own home network's traffic — one that knows what your devices normally do and flags anomalies on its own, no attack signatures or third-party datasets involved. The model is yours alone; nobody else's network looks like yours, so nobody else's model would work here.
+
 **1. Capture your home traffic**
 
 This is where the training data comes from. The script listens on your Wi-Fi adapter and records flow statistics — packet counts, timings, byte totals — not the actual content of your traffic. Run it for 20-30 minutes and just use your network like you normally would: browse, watch a video, let your phone and other devices sit on the network.
@@ -62,6 +64,17 @@ Each flow gets one of five levels:
 - **Orange — Medium:** moderately unusual
 - **Red — High:** strongly anomalous
 - **Purple — Critical:** port scan, DDoS, or intrusion patterns
+
+## What Vigil sees (and what it doesn't)
+
+Vigil runs on your computer and watches traffic that reaches your machine. That shapes what it can catch:
+
+- ✅ Someone joins your network and runs a scan — usually caught. Scans start with ARP broadcasts ("who's at this address?") that every device on the network receives, including yours.
+- ✅ Anything aimed directly at your computer — caught. Those packets land on your adapter.
+- ❌ A direct, no-scan attack on another device — missed. That traffic never passes through your machine.
+- ❌ An attack on the router from outside — missed. It happens before traffic reaches your network.
+
+In practice most attacks (and most automated tools) scan the network first, so the reconnaissance phase tends to show up even when the real target is something else. To cover the whole network instead of just your machine, Vigil would need to run on the router or gateway — see the notes in the repo's discussion for that setup.
 
 ## A note on sharing
 
