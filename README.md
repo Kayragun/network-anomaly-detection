@@ -1,6 +1,6 @@
 # Vigil Network Anomaly Detection
 
-Vigil is a personal project, built and maintained by a single developer. Feedback and issues are welcome.
+> *Vigil is a personal project, built and maintained by a single developer. Feedback and issues are welcome.*
 
 Vigil watches your network traffic and flags anomalies in real time. It uses an IsolationForest model trained on your own home network traffic it learns what normal looks like, then alerts on anything that doesn't fit.
 
