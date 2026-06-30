@@ -12,53 +12,34 @@ from monitor import LiveMonitor, PYSHARK_AVAILABLE
 
 MODEL_PATH = Path(__file__).parent / "models" / "model.pkl"
 
-# Flows below this confidence threshold are not flagged as attacks
-ATTACK_THRESHOLD = 0.95
-
-# Common service ports that are not attack targets in home networks
-SAFE_PORTS = {80, 443, 53, 67, 68, 123, 5353, 1900, 5355}
-
-def is_whitelisted(rec):
-    """Return True if this flow is almost certainly benign home traffic."""
-    src = rec.get("src_ip", "")
-    dst = rec.get("dst_ip", "")
-    dst_port = rec.get("dst_port", 0)
-    if src.startswith("192.168.") and dst.startswith("192.168."):
-        return True
-    if dst_port in SAFE_PORTS:
-        return True
-    # Ephemeral ports are response traffic to outbound connections we initiated
-    if dst_port >= 32768:
-        return True
-    return False
 
 st.set_page_config(page_title="Vigil — Network IDS", page_icon="🛡️", layout="wide")
 
 st.title("🛡️ Vigil — Network Anomaly Detection")
-st.caption("Random Forest IDS trained on the TII-SSRC-23 dataset")
+st.caption("Anomaly detection trained on your own home network traffic")
 
 @st.cache_resource
 def load_model():
     if not MODEL_PATH.exists():
-        return None, None, None, None
+        return None, None, None
     a = joblib.load(MODEL_PATH)
-    return a["model"], a["scaler"], a["label_encoder"], a["feature_cols"]
+    return a["model"], a["scaler"], a["feature_cols"]
 
-model, scaler, label_encoder, feature_cols = load_model()
+model, scaler, feature_cols = load_model()
 
 if model is None:
     st.error(
         "**model.pkl not found.**  \n"
-        "Run `notebooks/train.ipynb` on Google Colab and place the downloaded "
-        "`model.pkl` in the `models/` folder."
+        "Capture home traffic with `src/capture_home.py`, then run "
+        "`notebooks/train.ipynb` on Google Colab and place `model.pkl` in `models/`."
     )
     st.stop()
 
 with st.sidebar:
     st.header("Model Info")
-    st.write(f"**Classes:** {', '.join(label_encoder.classes_)}")
+    st.write(f"**Type:** Anomaly Detection (IsolationForest)")
     st.write(f"**Features:** {len(feature_cols)}")
-    st.write(f"**Model:** RandomForestClassifier")
+    st.write(f"**Training data:** Home network traffic")
 
 tab1, tab2, tab3 = st.tabs(["Single Prediction", "Batch Prediction (CSV)", "Live Monitoring"])
 
@@ -76,45 +57,48 @@ with tab1:
             sample_input[col] = row_cols[j].number_input(col, value=0.0, key=f"feat_{col}")
 
     if st.button("Predict", type="primary"):
+        import numpy as np
         row_df = pd.DataFrame([sample_input])
         X = scaler.transform(row_df[feature_cols].values)
-        pred_idx = model.predict(X)[0]
-        proba = model.predict_proba(X)[0]
-        label = label_encoder.inverse_transform([pred_idx])[0]
-        confidence = float(proba.max())
+        pred = model.predict(X)[0]
+        score = model.decision_function(X)[0]
+        label = "Benign" if pred == 1 else "Anomaly"
+        confidence = float(np.clip(abs(score) / 0.2, 0.0, 1.0))
 
-        if label.lower() == "benign":
-            st.success(f"**Sonuç: {label}** — Güven: {confidence:.1%}")
+        if pred == 1:
+            st.success(f"**{label}** — Anomaly score: {score:.4f}")
         else:
-            st.error(f"**Sonuç: {label}** — Güven: {confidence:.1%}")
+            st.error(f"**{label}** — Anomaly score: {score:.4f}")
 
-        proba_df = pd.DataFrame({"Class": label_encoder.classes_, "Probability": proba}).sort_values("Probability", ascending=False)
-        st.bar_chart(proba_df.set_index("Class"))
+        st.caption("Score < 0 = anomaly. More negative = more unusual.")
 
 with tab2:
     st.subheader("Batch Prediction via CSV Upload")
     uploaded = st.file_uploader("Upload a CSV file containing feature columns", type=["csv"])
 
     if uploaded:
+        import numpy as np
         df = pd.read_csv(uploaded, low_memory=False)
+        available = [c for c in feature_cols if c in df.columns]
         missing = [c for c in feature_cols if c not in df.columns]
         if missing:
-            st.error(f"Missing columns: {missing}")
-        else:
-            X = scaler.transform(df[feature_cols].values)
-            preds = model.predict(X)
-            probas = model.predict_proba(X).max(axis=1)
-            df["prediction"] = label_encoder.inverse_transform(preds)
-            df["confidence"] = probas
+            st.warning(f"Missing {len(missing)} columns — filling with 0.")
+            for c in missing:
+                df[c] = 0.0
+        X = scaler.transform(df[feature_cols].values)
+        preds = model.predict(X)
+        scores = model.decision_function(X)
+        df["prediction"] = ["Benign" if p == 1 else "Anomaly" for p in preds]
+        df["anomaly_score"] = scores
 
-            st.write(f"**{len(df)} records** processed.")
-            st.dataframe(df[["prediction", "confidence"]].head(100))
+        st.write(f"**{len(df)} records** processed.")
+        st.dataframe(df[["prediction", "anomaly_score"]].head(100))
 
-            attack_counts = df["prediction"].value_counts()
-            st.bar_chart(attack_counts)
+        attack_counts = df["prediction"].value_counts()
+        st.bar_chart(attack_counts)
 
-            csv_out = df.to_csv(index=False).encode("utf-8")
-            st.download_button("Download Results (CSV)", csv_out, "vigil_predictions.csv", "text/csv")
+        csv_out = df.to_csv(index=False).encode("utf-8")
+        st.download_button("Download Results (CSV)", csv_out, "vigil_predictions.csv", "text/csv")
 
 with tab3:
     st.subheader("Live Network Monitoring")
@@ -147,7 +131,7 @@ with tab3:
     with col_info:
         iface = st.text_input("Network Interface", value="Wi-Fi", key="iface", label_visibility="collapsed")
 
-    st.caption(f"Attack threshold: confidence > {ATTACK_THRESHOLD:.0%}  |  Flows are classified after 5s of inactivity")
+    st.caption("Each flow is scored after 5s of inactivity")
 
     # Drain queue and update log
     if st.session_state.monitor:
@@ -156,10 +140,6 @@ with tab3:
         while not alert_q.empty():
             try:
                 rec = alert_q.get_nowait()
-                if rec.get("is_attack"):
-                    if is_whitelisted(rec) or rec.get("confidence", 0) < ATTACK_THRESHOLD:
-                        rec["is_attack"] = False
-                        rec["label"] = "Benign"
                 new_records.append(rec)
             except queue.Empty:
                 break
@@ -176,14 +156,14 @@ with tab3:
 
         m1, m2, m3 = st.columns(3)
         m1.metric("Total Flows", len(log))
-        m2.metric("Attacks", len(attacks))
-        m3.metric("Benign", len(benign))
+        m2.metric("Anomalies", len(attacks))
+        m3.metric("Normal", len(benign))
 
         for err in errors:
             st.error(err["error"])
 
         if attacks:
-            st.error(f"**{len(attacks)} attack(s) detected!**")
+            st.error(f"**{len(attacks)} anomaly(ies) detected!**")
             attack_df = pd.DataFrame(attacks)[["timestamp", "src_ip", "dst_ip", "dst_port", "label", "confidence"]]
             attack_df["confidence"] = attack_df["confidence"].map("{:.1%}".format)
             st.dataframe(attack_df, use_container_width=True)

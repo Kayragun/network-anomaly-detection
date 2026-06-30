@@ -7,12 +7,14 @@ Requirements:
   - Npcap installed (npcap.com) with WinPcap-compatible mode
   - Run as Administrator for packet capture
 """
+import collections
 import queue
 import threading
 import time
 from pathlib import Path
 
 import joblib
+import numpy as np
 import pandas as pd
 
 try:
@@ -84,6 +86,42 @@ def cic_to_model_row(cic_data: dict, feature_cols) -> pd.DataFrame:
     return pd.DataFrame([row])[list(feature_cols)]
 
 
+PORT_SCAN_WINDOW = 30      # seconds to look back
+PORT_SCAN_THRESHOLD = 4    # distinct dst ports to same dst_ip from same src_ip
+PORT_SCAN_IGNORE = {80, 443, 8080, 8443}  # common web ports, skip in scan count
+
+
+class _PortScanTracker:
+    """Tracks distinct destination ports per (src_ip, dst_ip) pair in a sliding window."""
+
+    def __init__(self, window=PORT_SCAN_WINDOW, threshold=PORT_SCAN_THRESHOLD):
+        self.window = window
+        self.threshold = threshold
+        # (src_ip, dst_ip) -> deque of (timestamp, dst_port)
+        self._hits: dict[tuple, collections.deque] = collections.defaultdict(
+            lambda: collections.deque()
+        )
+        self._lock = threading.Lock()
+
+    def record(self, src_ip: str, dst_ip: str, dst_port: int) -> bool:
+        """Record a connection; return True if port scan threshold exceeded."""
+        if dst_port in PORT_SCAN_IGNORE:
+            return False
+        now = time.time()
+        with self._lock:
+            key = (src_ip, dst_ip)
+            dq = self._hits[key]
+            dq.append((now, dst_port))
+            cutoff = now - self.window
+            while dq and dq[0][0] < cutoff:
+                dq.popleft()
+            distinct_ports = len({p for _, p in dq})
+            return distinct_ports >= self.threshold
+
+
+_port_scan_tracker = _PortScanTracker()
+
+
 class _ClassifyingWriter(OutputWriter):
     """Intercepts completed flows from FlowSession and classifies them."""
 
@@ -101,15 +139,40 @@ class _ClassifyingWriter(OutputWriter):
 
             model = self.artifacts["model"]
             scaler = self.artifacts["scaler"]
-            le = self.artifacts["label_encoder"]
             feature_cols = self.artifacts["feature_cols"]
 
             X_raw = cic_to_model_row(data, feature_cols)
             X = scaler.transform(X_raw.values)
-            pred_idx = model.predict(X)[0]
-            proba = model.predict_proba(X)[0]
-            label = le.inverse_transform([pred_idx])[0]
-            confidence = float(proba.max())
+            pred = model.predict(X)[0]          # 1 = normal, -1 = anomaly
+            score = model.decision_function(X)[0]  # higher = more normal
+
+            label = "Benign" if pred == 1 else "Anomaly"
+            # Convert score to a 0-1 confidence: clip score to [-0.2, 0.2] range
+            confidence = float(np.clip(abs(score) / 0.2, 0.0, 1.0))
+
+            # Skip broadcast/multicast destinations — IoT devices flood these normally
+            is_broadcast = (
+                dst_ip.endswith(".255") or
+                dst_ip.startswith("224.") or
+                dst_ip.startswith("239.")
+            )
+
+            # Heuristic port scan detection: many distinct dst ports to same host.
+            # Identify the scanner as the side with the higher (ephemeral) port.
+            is_port_scan = False
+            if not is_broadcast:
+                if src_port > dst_port:
+                    scanner_ip, target_ip, service_port = src_ip, dst_ip, dst_port
+                else:
+                    scanner_ip, target_ip, service_port = dst_ip, src_ip, src_port
+                is_port_scan = _port_scan_tracker.record(scanner_ip, target_ip, service_port)
+
+            if is_broadcast:
+                label = "Benign"
+                confidence = 1.0
+            elif is_port_scan and label.lower() == "benign":
+                label = "Anomaly"
+                confidence = 1.0
 
             record = {
                 "timestamp": time.strftime("%H:%M:%S"),

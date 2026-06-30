@@ -7,33 +7,32 @@ MODEL_PATH = Path(__file__).parent.parent / "models" / "model.pkl"
 
 
 def load_artifacts(model_path: str | Path = MODEL_PATH) -> tuple:
-    """model.pkl içinden model, scaler ve label_encoder'ı yükler."""
+    """Loads model, scaler, and feature columns from model.pkl."""
     artifacts = joblib.load(model_path)
-    return artifacts["model"], artifacts["scaler"], artifacts["label_encoder"], artifacts["feature_cols"]
+    return artifacts["model"], artifacts["scaler"], artifacts["feature_cols"]
 
 
 def predict_single(row: dict, model_path: str | Path = MODEL_PATH) -> dict:
-    """Tek bir bağlantı kaydı için tahmin yapar."""
-    model, scaler, label_encoder, feature_cols = load_artifacts(model_path)
+    """Scores a single flow. Returns label, anomaly score, and confidence."""
+    model, scaler, feature_cols = load_artifacts(model_path)
     df = pd.DataFrame([row])[feature_cols]
     X = scaler.transform(df.values)
-    pred_idx = model.predict(X)[0]
-    proba = model.predict_proba(X)[0]
-    label = label_encoder.inverse_transform([pred_idx])[0]
+    pred = model.predict(X)[0]            # 1 = normal, -1 = anomaly
+    score = float(model.decision_function(X)[0])  # higher = more normal
     return {
-        "prediction": label,
-        "confidence": float(proba.max()),
-        "probabilities": dict(zip(label_encoder.classes_, proba.tolist())),
+        "prediction": "Benign" if pred == 1 else "Anomaly",
+        "anomaly_score": score,
+        "confidence": float(np.clip(abs(score) / 0.2, 0.0, 1.0)),
     }
 
 
 def predict_batch(df: pd.DataFrame, model_path: str | Path = MODEL_PATH) -> pd.DataFrame:
-    """Bir DataFrame üzerinde batch tahmin yapar; sonuçları yeni sütun olarak ekler."""
-    model, scaler, label_encoder, feature_cols = load_artifacts(model_path)
+    """Scores a DataFrame of flows; adds prediction and anomaly_score columns."""
+    model, scaler, feature_cols = load_artifacts(model_path)
     X = scaler.transform(df[feature_cols].values)
     preds = model.predict(X)
-    probas = model.predict_proba(X).max(axis=1)
+    scores = model.decision_function(X)
     df = df.copy()
-    df["prediction"] = label_encoder.inverse_transform(preds)
-    df["confidence"] = probas
+    df["prediction"] = ["Benign" if p == 1 else "Anomaly" for p in preds]
+    df["anomaly_score"] = scores
     return df

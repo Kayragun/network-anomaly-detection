@@ -1,14 +1,14 @@
 """
-Home traffic capture script for fine-tuning Vigil.
+Home traffic capture script for Vigil.
 
-Captures live traffic using cicflowmeter, labels everything as Benign,
-and saves to a CSV that can be added to the training set in Colab.
+Captures live network traffic using cicflowmeter and saves it as a CSV.
+This is the training data for the anomaly detection model — run it while
+using your network normally so the model learns what your traffic looks like.
 
 Usage (run as Administrator):
-    python src/capture_home.py --duration 600 --interface Wi-Fi --output data/home_traffic.csv
+    python src/capture_home.py --duration 1800 --interface Wi-Fi --output data/home_traffic.csv
 
-The output CSV can then be uploaded to Colab alongside the main dataset
-for fine-tuning the model on real home network traffic.
+Upload the output CSV to Colab and run notebooks/train.ipynb to build the model.
 """
 import argparse
 import csv
@@ -124,8 +124,8 @@ def capture(interface: str, duration: int, output: str):
         sniffer.stop()
         session.flush_flows()
 
-    print(f"\nTamamlandi! {counter[0]} Benign akis kaydedildi -> {output_path}")
-    print("Bu dosyayi Colab'da train.ipynb'e fine-tuning verisi olarak ekleyebilirsiniz.")
+    print(f"\nTamamlandi! {counter[0]} akis kaydedildi -> {output_path}")
+    print("Bu dosyayi Colab'da train.ipynb ile modeli egitmek icin kullanin.")
 
 
 if __name__ == "__main__":
