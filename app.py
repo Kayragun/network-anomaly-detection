@@ -148,7 +148,7 @@ with tab3:
     with col_info:
         iface = st.text_input("Network Interface", value="Wi-Fi", key="iface", label_visibility="collapsed")
 
-    st.caption("Each flow is scored ~15s after it goes idle")
+    st.caption("Each flow is scored ~8s after it goes idle")
 
     st.markdown(
         "**Severity:** "
@@ -202,7 +202,7 @@ with tab3:
                 st.dataframe(style_severity(all_df.head(50)), use_container_width=True)
 
     elif st.session_state.monitor and st.session_state.monitor.is_running():
-        st.info("Waiting for flows... (each flow appears after 5 seconds of inactivity)")
+        st.info("Waiting for flows... (each flow appears ~8s after it goes idle)")
 
     # Auto-refresh while running
     if st.session_state.monitor and st.session_state.monitor.is_running():

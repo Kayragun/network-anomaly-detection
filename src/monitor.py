@@ -23,10 +23,10 @@ try:
     from cicflowmeter.writer import OutputWriter
     from scapy.all import AsyncSniffer
     CICFLOW_AVAILABLE = True
-    # Flush idle flows after 15s instead of the 240s default, and GC more often.
+    # Flush idle flows after 8s instead of the 240s default, and GC more often.
     # Patched here so it works on a fresh install without editing the package.
-    _fs.EXPIRED_UPDATE = 15
-    _fs.PACKETS_PER_GC = 100
+    _fs.EXPIRED_UPDATE = 8
+    _fs.PACKETS_PER_GC = 50
 except ImportError:
     CICFLOW_AVAILABLE = False
 
@@ -276,7 +276,7 @@ class LiveMonitor:
             while not self._stop_event.is_set():
                 time.sleep(0.5)
                 now = time.time()
-                if now - last_gc >= 3:
+                if now - last_gc >= 2:
                     try:
                         session.garbage_collect(now)
                     except Exception:

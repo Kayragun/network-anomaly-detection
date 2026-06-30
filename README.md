@@ -51,7 +51,7 @@ Open http://localhost:8501.
 python test_portscan.py 192.168.1.1
 ```
 
-You should see the flows show up as Critical (purple) in the dashboard within about 15-20 seconds.
+You should see the flows show up as Critical (purple) in the dashboard within about 10 seconds.
 
 ## Severity levels
 
