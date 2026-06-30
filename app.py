@@ -30,9 +30,9 @@ def style_severity(df):
     return df.style.apply(_row_color, axis=1)
 
 
-st.set_page_config(page_title="Vigil — Network IDS", page_icon="🛡️", layout="wide")
+st.set_page_config(page_title="Network Anomaly Detection", page_icon="🛡️", layout="wide")
 
-st.title("🛡️ Vigil — Network Anomaly Detection")
+st.title("🛡️ Network Anomaly Detection Trained on Home Network Traffic")
 st.caption("Anomaly detection trained on your own home network traffic")
 
 @st.cache_resource

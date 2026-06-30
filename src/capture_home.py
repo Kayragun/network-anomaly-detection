@@ -1,5 +1,5 @@
 """
-Home traffic capture script for Vigil.
+Home traffic capture script for the network anomaly detection model.
 
 Captures live network traffic using cicflowmeter and saves it as a CSV.
 This is the training data for the anomaly detection model — run it while

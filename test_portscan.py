@@ -1,5 +1,5 @@
 """
-Port scan simulation for testing Vigil detection.
+Port scan simulation for testing anomaly detection.
 Connects to multiple ports on the target with a small delay so cicflowmeter
 has time to register each flow before the next one starts.
 """
@@ -24,4 +24,4 @@ for port in PORTS:
         print(f"  {port}/tcp error: {e}")
     time.sleep(DELAY)
 
-print("Done. Check Vigil for alerts.")
+print("Done. Check the dashboard for alerts.")

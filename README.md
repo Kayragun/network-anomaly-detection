@@ -1,8 +1,8 @@
-# Vigil Network Anomaly Detection
+# Network Anomaly Detection Trained on Home Network Traffic
 
-> *Vigil is a personal project, built and maintained by a single developer. Feedback and issues are welcome.*
+> *A personal project, built and maintained by a single developer. Feedback and issues are welcome.*
 
-Vigil watches your network traffic and flags anomalies in real time. It uses an IsolationForest model trained on your own home network traffic it learns what normal looks like, then alerts on anything that doesn't fit.
+Watches your network traffic and flags anomalies in real time. It uses an IsolationForest model trained on your own home network traffic it learns what normal looks like, then alerts on anything that doesn't fit.
 
 No attack labels, no dataset download. The model is trained on your traffic, so it knows your devices the robot vacuum, the phone, the laptop. Anything that breaks from that pattern gets flagged.
 
@@ -47,7 +47,7 @@ Open http://localhost:8501.
 
 ## Testing it
 
-`test_portscan.py` is a small helper that fakes a port scan against a target on your network. It connects to a dozen common ports one after another, which is exactly the kind of pattern Vigil should flag. Run it while monitoring is on to check that detection works:
+`test_portscan.py` is a small helper that fakes a port scan against a target on your network. It connects to a dozen common ports one after another, which is exactly the kind of pattern the model should flag. Run it while monitoring is on to check that detection works:
 
 ```bash
 python test_portscan.py 192.168.1.1
@@ -65,16 +65,16 @@ Each flow gets one of five levels:
 - **Red High:** strongly anomalous
 - **Purple Critical:** port scan, DDoS, or intrusion patterns
 
-## What Vigil sees (and what it doesn't)
+## What it sees (and what it doesn't)
 
-Vigil runs on your computer and watches traffic that reaches your machine. That shapes what it can catch:
+Runs on your computer and watches traffic that reaches your machine. That shapes what it can catch:
 
 - ✅ Someone joins your network and runs a scan usually caught. Scans start with ARP broadcasts ("who's at this address?") that every device on the network receives, including yours.
 - ✅ Anything aimed directly at your computer caught. Those packets land on your adapter.
 - ❌ A direct, no-scan attack on another device missed. That traffic never passes through your machine.
 - ❌ An attack on the router from outside missed. It happens before traffic reaches your network.
 
-In practice most attacks (and most automated tools) scan the network first, so the reconnaissance phase tends to show up even when the real target is something else. To cover the whole network instead of just your machine, Vigil would need to run on the router or gateway see the notes in the repo's discussion for that setup.
+In practice most attacks (and most automated tools) scan the network first, so the reconnaissance phase tends to show up even when the real target is something else. To cover the whole network instead of just your machine, this would need to run on the router or gateway see the notes in the repo's discussion for that setup.
 
 ## A note on sharing
 
