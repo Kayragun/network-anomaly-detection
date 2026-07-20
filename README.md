@@ -108,6 +108,6 @@ IsolationForest learns the structure of normal traffic. It doesn't need attack e
 
 The `contamination` parameter (default 1%) tells the model what fraction of your capture to treat as noise. Raise it if you have too many false alarms, lower it for stricter detection.
 
-## Author
+## License
 
-**Kayra Gun** [GitHub](https://github.com/Kayragun) · [LinkedIn](https://www.linkedin.com/in/kayragun/)
+Released under the [MIT License](LICENSE).
